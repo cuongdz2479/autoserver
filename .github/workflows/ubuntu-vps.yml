@@ -1,0 +1,28 @@
+name: Ubuntu VPS
+
+on:
+  workflow_dispatch: # Kích hoạt thủ công (bằng tay)
+
+jobs:
+  run-vps:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Cài đặt SSH Server
+        run: |
+          # Cập nhật gói và cài SSH Server
+          sudo apt-get update
+          sudo apt-get install -y openssh-server
+          # Tạo thư mục cho SSH
+          sudo mkdir -p /run/sshd
+          # Đặt mật khẩu root
+          echo 'root:vpsgithub123@' | sudo chpasswd
+          # Cho phép root đăng nhập qua SSH
+          sudo sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
+          sudo sed -i 's/PermitRootLogin without-password/PermitRootLogin yes/' /etc/ssh/sshd_config
+          # Bắt đầu dịch vụ SSH
+          sudo service ssh start
+          # In địa chỉ IP (dùng cho kết nối SSH)
+          echo "VPS is running. Use SSH to connect."
+          echo "Username: root"
+          echo "Password: your_password"
