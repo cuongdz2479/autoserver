@@ -1,28 +1,43 @@
-name: Ubuntu VPS
+name: Ubuntu VPS với Ngrok
 
 on:
-  workflow_dispatch: # Kích hoạt thủ công (bằng tay)
+  workflow_dispatch:  # Kích hoạt thủ công (bằng tay)
 
 jobs:
   run-vps:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Cài đặt SSH Server
+      - name: Cài đặt Ngrok
         run: |
-          # Cập nhật gói và cài SSH Server
+          # Tải và cài đặt Ngrok
+          wget https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz
+          tar -xvzf ngrok-v3-stable-linux-amd64.tgz
+          sudo mv ngrok /usr/local/bin
+
+      - name: Cài đặt SSH và cấu hình VPS
+        run: |
+          # Cài đặt SSH
           sudo apt-get update
           sudo apt-get install -y openssh-server
-          # Tạo thư mục cho SSH
           sudo mkdir -p /run/sshd
           # Đặt mật khẩu root
           echo 'root:vpsgithub123@' | sudo chpasswd
           # Cho phép root đăng nhập qua SSH
           sudo sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
-          sudo sed -i 's/PermitRootLogin without-password/PermitRootLogin yes/' /etc/ssh/sshd_config
-          # Bắt đầu dịch vụ SSH
           sudo service ssh start
-          # In địa chỉ IP (dùng cho kết nối SSH)
-          echo "VPS is running. Use SSH to connect."
-          echo "Username: root"
-          echo "Password: your_password"
+
+      - name: Cấu hình và chạy Ngrok
+        run: |
+          # Cấu hình Ngrok với auth token của bạn
+          ngrok config add-authtoken 2pZPt6HM8h3g9TD7tGz5mBU6P4u_861HhSoYrfqxKdnPPeipm
+          # Chạy Ngrok để tạo kết nối SSH (cổng 22)
+          ngrok tcp 22 > ngrok.log &
+          sleep 5
+          # Lấy địa chỉ kết nối từ log của Ngrok
+          cat ngrok.log | grep -o "tcp://[0-9a-zA-Z.:-]*"
+
+      - name: Lấy địa chỉ SSH
+        run: |
+          echo "SSH Forwarding is active."
+          echo "Use the following to connect: ssh root@<ngrok_tcp_address> -p <ngrok_tcp_port>"
