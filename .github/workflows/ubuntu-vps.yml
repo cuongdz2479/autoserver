@@ -1,43 +1,47 @@
-name: Ubuntu VPS với Ngrok
+name: VPS Setup (Automatic on GitHub)
 
 on:
-  workflow_dispatch:  # Kích hoạt thủ công (bằng tay)
+  push:
+    branches:
+      - main  # Workflow sẽ tự động chạy mỗi khi bạn push lên nhánh main.
 
 jobs:
-  run-vps:
-    runs-on: ubuntu-latest
+  setup-vps:
+    runs-on: ubuntu-latest  # Chạy trên môi trường Ubuntu của GitHub Actions.
 
     steps:
-      - name: Cài đặt Ngrok
+      - name: Checkout repository
+        uses: actions/checkout@v2  # Kiểm tra mã nguồn từ GitHub repository.
+
+      - name: Cài đặt Python và Flask (hoặc môi trường khác của bạn)
         run: |
-          # Tải và cài đặt Ngrok
+          sudo apt-get update
+          sudo apt-get install -y python3-pip
+          pip3 install flask
+
+      - name: Chạy ứng dụng Flask
+        run: |
+          echo "from flask import Flask\napp = Flask(__name__)\n@app.route('/')\ndef home():\n    return 'Hello from GitHub Actions!'\nif __name__ == '__main__':\n    app.run(host='0.0.0.0', port=80)" > app.py
+          python3 app.py &  # Chạy Flask trong nền
+
+      - name: Tạo Ngrok HTTP Tunnel
+        run: |
+          # Cài đặt Ngrok (có thể bỏ qua nếu bạn không cần Ngrok)
           wget https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz
           tar -xvzf ngrok-v3-stable-linux-amd64.tgz
           sudo mv ngrok /usr/local/bin
 
-      - name: Cài đặt SSH và cấu hình VPS
-        run: |
-          # Cài đặt SSH
-          sudo apt-get update
-          sudo apt-get install -y openssh-server
-          sudo mkdir -p /run/sshd
-          # Đặt mật khẩu root
-          echo 'root:vpsgithub123@' | sudo chpasswd
-          # Cho phép root đăng nhập qua SSH
-          sudo sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
-          sudo service ssh start
+          # Cấu hình với Ngrok auth token
+          ngrok config add-authtoken ${{ secrets.NGROK_AUTH_TOKEN }}
+          
+          # Tạo tunnel cho HTTP
+          ngrok http 80 > ngrok.log &
 
-      - name: Cấu hình và chạy Ngrok
-        run: |
-          # Cấu hình Ngrok với auth token của bạn
-          ngrok config add-authtoken 2pZPt6HM8h3g9TD7tGz5mBU6P4u_861HhSoYrfqxKdnPPeipm
-          # Chạy Ngrok để tạo kết nối SSH (cổng 22)
-          ngrok tcp 22 > ngrok.log &
+          # Đợi cho Ngrok khởi động và lấy URL
           sleep 5
-          # Lấy địa chỉ kết nối từ log của Ngrok
-          cat ngrok.log | grep -o "tcp://[0-9a-zA-Z.:-]*"
+          cat ngrok.log | grep -o "http://[0-9a-zA-Z.:-]*"  # In URL Ngrok ra console
 
-      - name: Lấy địa chỉ SSH
+      - name: Kết quả URL Ngrok
         run: |
-          echo "SSH Forwarding is active."
-          echo "Use the following to connect: ssh root@<ngrok_tcp_address> -p <ngrok_tcp_port>"
+          echo "Ứng dụng của bạn đang chạy tại: "
+          cat ngrok.log | grep -o "http://[0-9a-zA-Z.:-]*"
